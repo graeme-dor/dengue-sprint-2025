@@ -53,7 +53,7 @@ A list of all libraries and packages used to process the data and train your mod
 - Climate.csv  
 
 ### Data preprocessing
-- For the random forest model, the climate variables used (med temperature, med precipitation and med rel humidity) were lagged by 8 weeks, and states were clustered into 4 clusters based on climate similarity to account for geographic effects. Dates were transformed into a seasonality parameter by taking the cosine and sine of the week.  Predicted case values were smoothed over a 16 week window (aligned center). 
+- For the random forest model, the climate variables used (med temperature, med precipitation and med rel humidity) were lagged by 8 weeks (using forecasted climate data for the periods extending from EW25-EW40 for the respective testing periods), and states were clustered into 4 clusters based on climate similarity to account for geographic effects. Dates were transformed into a seasonality parameter by taking the cosine and sine of the week.  Predicted case values were smoothed over a 16 week window (aligned center). 
 
 ### Variable selection
 Predictors were chosen based on optimal model performances by trial-and-error. For random forest model, climatic predictors included med temperature, med precipitation and med rel humidity.
