@@ -16,11 +16,9 @@ Organisation: Centre for Epidemic Response and Innovation (CERI), School of Data
 
 A brief description of the contents and purpose of each folder and file in the repository:
 <pre>
-```
-├── models/                # Trained models, weights, or model configuration files
+├── models/                # Trained models
 ├── outputs/               # Forecast results
 └── README.md              # Project overview and documentation
-```
 </pre>
 
 
@@ -28,11 +26,10 @@ A brief description of the contents and purpose of each folder and file in the r
 
 ## Libraries and Dependencies
 
-A list of all libraries and packages used to process the data and train your model:
+A list of all libraries and packages used to process the data and train the models:
 
 - `tidyverse`
 - `lubridate`
-- `scikit-learn`
 - `tsibble`
 - `feasts`
 - `fable`
@@ -42,49 +39,87 @@ A list of all libraries and packages used to process the data and train your mod
 - `mgcv`
 - `Metrics`
 - `randomForest`
+- `scikit-learn`
+- `keras`
+- `tensorflow`
+- `reticulate`
 
 ---
 
 ## Data and Variables
 
-### Datasets and variables used
-- Dengue.csv
+### Datasets and Variables Used
 
-- Climate.csv  
+- `dengue.csv` – Weekly dengue case counts at the municipal level  
+- `climate.csv` – Historical climate variables (temperature, precipitation, relative humidity)  
+- `forecasted_climate.csv` – Climate forecasts used for EW26–EW40  
 
-### Data preprocessing
-- For the random forest model, the climate variables used (med temperature, med precipitation and med rel humidity) were lagged by 8 weeks, and states were clustered into 4 clusters based on climate similarity to account for geographic effects. Dates were transformed into a seasonality parameter by taking the cosine and sine of the week.  Predicted case values were smoothed over a 16 week window (aligned center). 
+### Data Preprocessing
 
-### Variable selection
-Predictors were chosen based on optimal model performances by trial-and-error. For random forest model, climatic predictors included med temperature, med precipitation and med rel humidity.
+- **Random Forest**: Climate predictors (median temperature, precipitation, and relative humidity) were lagged by 8 weeks and joined with the dengue case data. States were grouped into 4 climate similarity clusters using hierarchical clustering based on average climate features. Weekly seasonality was encoded using sine and cosine transformations of the epidemiological week. Final predictions were smoothed using a centered rolling mean over a 16-week window.  
+- **LSTM**: Models were trained using sequences of weekly dengue case counts (with optional inclusion of lagged climate covariates), structured into input windows. Unlike RF, LSTM did not use clustering or spatial groupings. Time steps were set to 52 weeks.  
+- **Ensemble**: Predictions from RF and LSTM were evaluated per state, and the model with the lowest error (based on RMSE) was selected as the final ensemble prediction for that state.
+
+### Variable Selection
+
+- **Random Forest**: Climatic variables included median temperature, median precipitation, and median relative humidity. Variables were selected based on iterative testing and error minimization.  
+- **LSTM**: Primarily trained on dengue case histories with and without climate covariates, using combinations that yielded the lowest validation error per state.
 
 ---
 
 ## Model Training
 
-### Training details
-- Describe model architecture or algorithms used.
-    
-- Specify any cross-validation or time series split methods.
+### Training Details
 
-- For the random forest model, we ran a random forest regresion of 1000 iterations with the state as a fixed effect. 
+- **Random Forest**  
+  - Implemented using `randomForest` in R  
+  - Regression task using weekly dengue cases as the outcome  
+  - 1000 trees per model; `state` included as a fixed covariate  
+  - Trained separately for each climate cluster, then applied to corresponding states  
+  - Cross-validation was based on historical forecasting windows (rolling origin)  
 
-### Hyperparameter optimization
-- Detail any grid search, Bayesian optimization, or manual tuning used.
+- **LSTM**  
+  - Implemented using `keras` with `tensorflow` backend in R  
+  - Standard LSTM architecture: 1 hidden LSTM layer with 64 units, followed by a dense output layer  
+  - Trained with Adam optimizer, mean squared error loss, and early stopping  
+  - Validation based on walk-forward strategy over test periods  
 
-### Training code
-- Point to the specific script or notebook.
+- **Ensemble**  
+  - Final prediction = best-performing model (LSTM or RF) per state, selected based on lowest error on validation period  
+  - No additional meta-model or weighted average was used  
+
+### Hyperparameter Optimization
+
+- **Random Forest**  
+  - Number of trees fixed at 1000  
+  - No grid search required; performance evaluated empirically  
+
+- **LSTM**  
+  - Manual tuning of number of LSTM units (32–128), batch size (16–64), and input window size (fixed at 52)  
+  - Early stopping used to prevent overfitting  
+
+---
+
+## Training Code
+
+- All model training scripts can be found under the `models/` directory.  
+- Separate R scripts are provided for Random Forest and LSTM training.
 
 ---
 
 ## Data Usage Restriction
 
-- Forecasts from EW 41 (year N) to EW 40 (year N+1) are based **only** on data up to EW 25 (year N).
-  
-- Describe how this was enforced in preprocessing or model training.
+- Forecasts from **EW 41 (Year N)** to **EW 40 (Year N+1)** were generated using only data available **up to EW 25 (Year N)**.  
+- For **climate**, values from EW26 to EW40 were filled using `forecasted_climate.csv` (as provided).  
+- This restriction was enforced by:  
+  - Filtering the training datasets to exclude any case or climate data after EW25  
+  - Aligning lagged covariates to ensure that EW41–EW40 predictions never used future information  
 
 ---
 
 ## Predictive Uncertainty
 
-- How are your prediction intervals computed?
+- **Prediction intervals** were constructed empirically:  
+  - For **Random Forest**, we computed the standard deviation across the predictions of all trees (bootstrap sampling) to estimate uncertainty bounds.  
+  - For **LSTM**, prediction intervals were approximated using residual bootstrapping across multiple model runs.  
+  - For the **Ensemble**, we applied the uncertainty intervals from the selected model per state (either RF or LSTM).
